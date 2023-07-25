@@ -1,0 +1,101 @@
+/root/chains/fabric-samples.zip  
+/root/chains/Hyperledger-caliper.zip
+
+默认安装
+yum install git unzip yum-utils -y
+
+
+
+#下载nodejs
+mv node-v8.11.4-linux-x64.tar.xz /usr/local/
+cd /usr/local/
+#wget https://nodejs.org/dist/v8.11.4/node-v8.11.4-linux-x64.tar.xz
+tar xvf node-v8.11.4-linux-x64.tar.xz
+mv node-v8.11.4-linux-x64 nodejs
+rm /usr/bin/node 
+rm /usr/bin/npm 
+ln -s /usr/local/nodejs/bin/node /usr/bin/node
+ln -s /usr/local/nodejs/bin/npm /usr/bin/npm
+npm config set registry http://registry.npm.taobao.org
+yum install node-gyp -y
+
+
+
+
+#下载docker
+yum-config-manager --add-repo https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/centos/docker-ce.repo
+yum install -y yum-utils docker-ce  docker-ce-cli containerd.io
+echo """
+{
+	\"registry-mirrors\":[\"http://docker.mirrors.ustc.edu.cn\"]
+}""" >  /etc/docker/daemon.json
+systemctl start docker
+mv docker-compose-linux-x86_64 /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose
+systemctl start docker
+
+
+
+#获取caliper并测试
+#git clone git://github.com/caohuilong/Hyperledger-caliper
+cd Hyperledger-caliper
+npm install
+sudo npm install fabric-ca-client@1.1.0 fabric-client@1.1.0
+sudo npm install grpc@1.10.1
+node ./benchmark/simple/main.js
+
+
+
+
+
+
+#下载fabric-sample应用
+yum install git unzip yum-utils -y
+#git clone https://github.com/hyperledger/fabric-samples.git
+cd fabric-samples
+git checkout v1.4.3
+#wget http://github.com/hyperledger/fabric/releases/download/v1.4.3/hyperledger-fabric-linux-amd64-1.4.3.tar.gz
+#tar -zxvf hyperledger-fabric-linux-amd64-1.4.3.tar.gz
+
+
+#操作日志
+docker pull hyperledger/fabric-peer:1.4
+docker pull hyperledger/fabric-orderer:1.4
+docker pull hyperledger/fabric-tools:1.4
+docker tag hyperledger/fabric-peer:1.4 hyperledger/fabric-peer:latest
+docker tag hyperledger/fabric-orderer:1.4 hyperledger/fabric-orderer:latest
+docker tag hyperledger/fabric-tools:1.4 hyperledger/fabric-tools:latest
+./byfn.sh up -o solo -n
+docker logs peer0.org1.example.com --tail 30
+vi ./base/peer-base.yaml
+./byfn.sh down
+./byfn.sh up -o solo -n
+docker logs peer0.org1.example.com --tail 30
+
+
+
+#证书使用
+cd fabric-samples/first-network
+../bin/cryptogen generate --config=./crypto-config.yaml
+yum install -y tree
+cd crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp
+cat ./signcerts/peer0.org1.example.com-cert.pem
+openssl x509 -in signcerts/peer0.org1.example.com-cert.pem -text
+cat ./keystore/2dbd21b8a1...
+
+
+#智能合约部署和调用
+./byfn.sh generate -c mychannel
+./byfn.sh up -c mychannel -o solo -n
+docker exec cli ./scripts/install.sh
+docker exec cli ./scripts/invoke.sh
+docker exec cli ./scripts/upgrade.sh
+
+
+#获取couchdb镜像
+docker pull hyperledger/fabric-couchdb:0.4.10
+docker tag hyperledger/fabric-couchdb:0.4.10 hyperledger/fabric-couchdb:latest
+./byfn.sh up generate
+docker-compose -f docker-compose-cli.yaml -f docker-compose-couch.yaml up -d
+
+
+
